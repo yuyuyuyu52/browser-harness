@@ -278,7 +278,7 @@ def fill(selector, text):
         el.focus();
         el.value = '';
         el.value = {escaped_val};
-        el.dispatchEvent(new Event('input', {{bubbles: true}}));
+        el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
         el.dispatchEvent(new Event('change', {{bubbles: true}}));
         return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}}});
     }})()
