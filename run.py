@@ -15,6 +15,7 @@ from admin import (
     sync_local_profile,
 )
 from helpers import *
+from text_helpers import *
 
 HELP = """Browser Harness
 
