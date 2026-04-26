@@ -75,7 +75,7 @@ _DESCRIBE_JS = """
   for (const el of els) {
     if (items.length >= maxItems) break;
     const style = getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') continue;
+    if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) continue;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) continue;
 
@@ -97,14 +97,14 @@ _DESCRIBE_JS = """
     if (el.id) {
       selector = '#' + CSS.escape(el.id);
     } else if (el.getAttribute('data-testid')) {
-      selector = '[data-testid="' + el.getAttribute('data-testid') + '"]';
+      selector = '[data-testid="' + CSS.escape(el.getAttribute('data-testid')) + '"]';
     } else if (el.getAttribute('aria-label')) {
-      selector = tag + '[aria-label="' + el.getAttribute('aria-label') + '"]';
+      selector = tag + '[aria-label="' + CSS.escape(el.getAttribute('aria-label')) + '"]';
     } else if (el.name) {
-      selector = tag + '[name="' + el.name + '"]';
+      selector = tag + '[name="' + CSS.escape(el.name) + '"]';
     } else if (tag === 'a' && el.getAttribute('href')) {
       const href = el.getAttribute('href');
-      if (href.length < 100) selector = 'a[href="' + href + '"]';
+      if (href.length < 100) selector = 'a[href="' + CSS.escape(href) + '"]';
     }
     if (!selector) {
       const parent = el.parentElement;
@@ -160,10 +160,11 @@ def describe_page(max_items=50):
         return f"page: {title}\nurl: {url}\n\n(no interactive elements found)"
 
     items = json.loads(raw)
-    _write_cache(items)
+    visible = items[:max_items]
+    _write_cache(visible)
 
     groups = {}
-    for i, it in enumerate(items[:max_items]):
+    for i, it in enumerate(visible):
         cat = it["category"] + "s"
         groups.setdefault(cat, []).append((i, it))
 
@@ -227,7 +228,7 @@ def click_text(text):
         let bestLen = Infinity;
         for (const el of document.querySelectorAll(SEL)) {{
             const style = getComputedStyle(el);
-            if (style.display === 'none' || style.visibility === 'hidden') continue;
+            if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) continue;
             const t = (el.textContent || '').trim();
             if (t.toLowerCase().includes(target) && t.length < bestLen) {{
                 best = el;
@@ -280,6 +281,7 @@ def fill(selector, text):
         el.value = {escaped_val};
         el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
         el.dispatchEvent(new Event('change', {{bubbles: true}}));
+        el.dispatchEvent(new Event('blur', {{bubbles: true}}));
         return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}}});
     }})()
     """)
