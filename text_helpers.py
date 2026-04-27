@@ -14,6 +14,60 @@ CACHE_PATH = Path(f"/tmp/bu-describe-cache-{NAME}.json")
 CACHE_TTL = 60
 
 
+def _ensure_ready():
+    if not daemon_alive():
+        try:
+            ensure_daemon()
+        except RuntimeError:
+            raise RuntimeError("error | daemon not running, auto-start failed — check Chrome is running, then retry")
+    try:
+        ensure_real_tab()
+    except Exception:
+        pass
+
+
+def _page_snapshot():
+    try:
+        info = page_info()
+        if "dialog" in info:
+            d = info["dialog"]
+            return {"url": "", "title": "", "dialog": f"{d.get('type', '?')}: {d.get('message', '')}"}
+        return {"url": info.get("url", ""), "title": info.get("title", "")}
+    except Exception:
+        return {"url": "", "title": ""}
+
+
+def _quick_count():
+    try:
+        raw = js("document.querySelectorAll('a,button,input,select,textarea,[role=\"button\"],[onclick]').length")
+        return int(raw) if raw else 0
+    except Exception:
+        return 0
+
+
+def _is_css_selector(s):
+    for ch in ('#', '.', '[', '>', ':', '=', ' > ', ' ~ ', ' + '):
+        if ch in s:
+            return True
+    return False
+
+
+def _change_summary(before, after):
+    parts = []
+    if after.get("dialog"):
+        parts.append(f"dialog opened: {after['dialog']}")
+    elif before.get("url") != after.get("url"):
+        parts.append(f"url changed: {after['url']}")
+    elif before.get("title") != after.get("title"):
+        parts.append(f"title changed: {after['title']}")
+    else:
+        parts.append("page unchanged")
+    count = _quick_count()
+    if count:
+        parts.append(f"{count} interactive elements visible")
+    return " → ".join(parts)
+
+
 def status():
     if not daemon_alive():
         return "disconnected | daemon not running"
