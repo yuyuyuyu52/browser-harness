@@ -343,14 +343,22 @@ def click(target):
     return f"{result} → {_change_summary(before, after)}"
 
 
-def fill(selector, text):
+def fill(target, text):
     _ensure_ready()
+    if isinstance(target, int):
+        return fill_item(target, text)
+    selector = str(target)
     escaped_sel = json.dumps(selector)
     escaped_val = json.dumps(text)
+    before = _page_snapshot()
     result = js(f"""
     (function() {{
         const el = document.querySelector({escaped_sel});
         if (!el) return JSON.stringify({{error: "not found"}});
+        const tag = el.tagName.toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select' && !el.isContentEditable) {{
+            return JSON.stringify({{error: "not an input", tag: tag}});
+        }}
         el.scrollIntoView({{block: 'center'}});
         el.focus();
         el.value = '';
@@ -358,15 +366,20 @@ def fill(selector, text):
         el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
         el.dispatchEvent(new Event('change', {{bubbles: true}}));
         el.dispatchEvent(new Event('blur', {{bubbles: true}}));
-        return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}}});
+        return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}, tag: tag}});
     }})()
     """)
     if not result:
-        return f"error | selector '{selector}' not found. use describe_page() to see available elements"
+        return f"error | selector '{selector}' not found — call describe_page() to see current elements"
     r = json.loads(result)
-    if r.get("error"):
-        return f"error | selector '{selector}' not found. use describe_page() to see available elements"
-    return f"filled '{r['selector']}' with '{text}'"
+    if r.get("error") == "not found":
+        return f"error | selector '{selector}' not found — call describe_page() to see current elements"
+    if r.get("error") == "not an input":
+        return f"error | '{selector}' is a <{r.get('tag', '?')}>, not an input — use click() instead"
+    time.sleep(0.3)
+    after = _page_snapshot()
+    summary = _change_summary(before, after)
+    return f"filled '{selector}' with '{text}' → {summary}"
 
 
 def fill_item(index, text):
