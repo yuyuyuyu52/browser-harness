@@ -202,47 +202,52 @@ def describe_page(max_items=50):
     info = page_info()
     if "dialog" in info:
         d = info["dialog"]
-        return f"dialog open: {d.get('type', '?')} — {d.get('message', '')}\nhandle it before interacting with the page"
+        return f"error | dialog open: {d.get('type', '?')} — {d.get('message', '')}\nhandle it before interacting with the page"
 
     url = info.get("url", "")
     title = info.get("title", "")
     w, h = info.get("w", "?"), info.get("h", "?")
     sy, ph = info.get("sy", 0), info.get("ph", 0)
 
+    if not url or url.startswith(INTERNAL):
+        return "error | no page loaded — call go(url) to navigate first"
+
     script = _DESCRIBE_JS.replace("%%MAX_ITEMS%%", str(int(max_items * 2)))
     raw = js(script)
     if not raw:
-        return f"page: {title}\nurl: {url}\n\n(no interactive elements found)"
+        return f"page: {title} — {url}\nviewport: {w}x{h}\n\nno elements found — page may still be loading, try: wait_for_load() then describe_page()"
 
     items = json.loads(raw)
     visible = items[:max_items]
     _write_cache(visible)
 
-    groups = {}
+    lines = [f"page: {title} — {url}", f"viewport: {w}x{h} | scroll: {sy}/{ph}", ""]
     for i, it in enumerate(visible):
-        cat = it["category"] + "s"
-        groups.setdefault(cat, []).append((i, it))
+        cat = it["category"]
+        label = it.get("label", "")
+        sel = it.get("selector", "")
+        ph_val = it.get("placeholder", "")
+        if cat == "input" and ph_val:
+            lines.append(f'#{i} [{cat}] placeholder="{ph_val}" → {sel}')
+        elif label:
+            lines.append(f'#{i} [{cat}] "{label}" → {sel}')
+        else:
+            lines.append(f'#{i} [{it["tag"]}] → {sel}')
 
-    lines = [f"page: {title}", f"url: {url}", f"viewport: {w}x{h} | scroll: {sy}/{ph}", ""]
-    for cat in ["buttons", "inputs", "selects", "links", "others"]:
-        if cat not in groups:
-            continue
-        lines.append(f"[{cat}]")
-        for idx, it in groups[cat]:
-            label = it.get("label", "")
-            sel = it.get("selector", "")
-            ph = it.get("placeholder", "")
-            if it["category"] == "input" and ph:
-                lines.append(f'  #{idx} placeholder="{ph}" selector="{sel}"')
-            elif label:
-                lines.append(f'  #{idx} "{label}" selector="{sel}"')
-            else:
-                lines.append(f'  #{idx} ({it["tag"]}) selector="{sel}"')
-        lines.append("")
-
+    footer_parts = [f"{len(visible)} elements"]
     total = len(items)
     if total > max_items:
-        lines.append(f"...truncated ({total - max_items} more, use describe_page(max_items={total}) to see all)")
+        footer_parts.append(f"showing {max_items} of {total} (use describe_page(max_items={total}) for all)")
+    try:
+        viewport_h = int(h) if isinstance(h, int) else int(h)
+        scroll_y = int(sy)
+        page_h = int(ph)
+        if scroll_y + viewport_h < page_h - 50:
+            footer_parts.append("page has more content below (scroll down)")
+    except (ValueError, TypeError):
+        pass
+    lines.append("")
+    lines.append(" | ".join(footer_parts))
 
     return "\n".join(lines)
 
