@@ -367,17 +367,19 @@ def fill(target, text):
         el.scrollIntoView({{block: 'center'}});
         el.focus();
         if (el.isContentEditable) {{
-            el.innerText = '';
-            el.innerText = {escaped_val};
-            el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
+            // Rich text editors (X/Lexical, Draft.js, ProseMirror) need real input events.
+            // Select all + delete to clear, then return — caller uses type_text() to fill.
+            document.execCommand('selectAll');
+            document.execCommand('delete');
+            return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}, tag: tag, contentEditable: true}});
         }} else {{
             el.value = '';
             el.value = {escaped_val};
             el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
             el.dispatchEvent(new Event('change', {{bubbles: true}}));
             el.dispatchEvent(new Event('blur', {{bubbles: true}}));
+            return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}, tag: tag, contentEditable: false}});
         }}
-        return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}, tag: tag, contentEditable: el.isContentEditable}});
     }})()
     """)
     if not result:
@@ -387,6 +389,8 @@ def fill(target, text):
         return f"error | selector '{selector}' not found — call describe_page() to see current elements"
     if r.get("error") == "not an input":
         return f"error | '{selector}' is a <{r.get('tag', '?')}>, not an input — use click() instead"
+    if r.get("contentEditable"):
+        type_text(text)
     time.sleep(0.3)
     after = _page_snapshot()
     summary = _change_summary(before, after)
