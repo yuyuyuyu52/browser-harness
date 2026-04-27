@@ -123,7 +123,7 @@ def auto_connect():
 
 _DESCRIBE_JS = """
 (function(maxItems) {
-  const SEL = 'a, button, input, select, textarea, [role="button"], [onclick]';
+  const SEL = 'a, button, input, select, textarea, [role="button"], [role="textbox"], [contenteditable="true"], [onclick]';
   const els = document.querySelectorAll(SEL);
   const items = [];
   for (const el of els) {
@@ -138,11 +138,11 @@ _DESCRIBE_JS = """
     let category = 'other';
     if (tag === 'a') category = 'link';
     else if (tag === 'button' || el.getAttribute('role') === 'button' || el.hasAttribute('onclick')) category = 'button';
-    else if (tag === 'input' || tag === 'textarea') category = 'input';
+    else if (tag === 'input' || tag === 'textarea' || el.isContentEditable || el.getAttribute('role') === 'textbox') category = 'input';
     else if (tag === 'select') category = 'select';
 
     const text = (el.textContent || '').trim().slice(0, 80);
-    const placeholder = el.placeholder || '';
+    const placeholder = el.placeholder || el.getAttribute('aria-placeholder') || '';
     const ariaLabel = el.getAttribute('aria-label') || '';
     const label = text || ariaLabel || placeholder;
 
@@ -366,12 +366,18 @@ def fill(target, text):
         }}
         el.scrollIntoView({{block: 'center'}});
         el.focus();
-        el.value = '';
-        el.value = {escaped_val};
-        el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
-        el.dispatchEvent(new Event('change', {{bubbles: true}}));
-        el.dispatchEvent(new Event('blur', {{bubbles: true}}));
-        return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}, tag: tag}});
+        if (el.isContentEditable) {{
+            el.innerText = '';
+            el.innerText = {escaped_val};
+            el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
+        }} else {{
+            el.value = '';
+            el.value = {escaped_val};
+            el.dispatchEvent(new InputEvent('input', {{bubbles: true}}));
+            el.dispatchEvent(new Event('change', {{bubbles: true}}));
+            el.dispatchEvent(new Event('blur', {{bubbles: true}}));
+        }}
+        return JSON.stringify({{selector: {escaped_sel}, value: {escaped_val}, tag: tag, contentEditable: el.isContentEditable}});
     }})()
     """)
     if not result:
