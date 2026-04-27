@@ -398,6 +398,7 @@ def fill_item(index, text):
 
 def select_option(selector, value):
     _ensure_ready()
+    before = _page_snapshot()
     escaped_sel = json.dumps(selector)
     escaped_val = json.dumps(value)
     result = js(f"""
@@ -417,17 +418,20 @@ def select_option(selector, value):
     }})()
     """)
     if not result:
-        return f"error | selector '{selector}' not found"
+        return f"error | selector '{selector}' not found — call describe_page() to see current elements"
     r = json.loads(result)
     if r.get("error") == "no matching option":
         return f"error | no option '{value}' in {selector}. available: {r.get('available', '?')}"
     if r.get("error"):
         return f"error | {r['error']} for selector '{selector}'"
-    return f"selected '{r['selected']}' in '{selector}'"
+    time.sleep(0.3)
+    after = _page_snapshot()
+    return f"selected '{r['selected']}' in '{selector}' → {_change_summary(before, after)}"
 
 
 def check(selector, checked=True):
     _ensure_ready()
+    before = _page_snapshot()
     escaped_sel = json.dumps(selector)
     result = js(f"""
     (function() {{
@@ -440,12 +444,14 @@ def check(selector, checked=True):
     }})()
     """)
     if not result:
-        return f"error | selector '{selector}' not found"
+        return f"error | selector '{selector}' not found — call describe_page() to see current elements"
     r = json.loads(result)
     if r.get("error"):
-        return f"error | selector '{selector}' not found"
+        return f"error | selector '{selector}' not found — call describe_page() to see current elements"
     state = "checked" if r["checked"] else "unchecked"
-    return f"{state} '{selector}'"
+    time.sleep(0.3)
+    after = _page_snapshot()
+    return f"{state} '{selector}' → {_change_summary(before, after)}"
 
 
 def go(url):
@@ -457,6 +463,8 @@ def go(url):
 
 def back():
     _ensure_ready()
+    before = _page_snapshot()
     js("history.back()")
     wait_for_load()
-    return status()
+    after = _page_snapshot()
+    return f"back → {_change_summary(before, after)}"
