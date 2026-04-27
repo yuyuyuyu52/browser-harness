@@ -273,10 +273,10 @@ def click_selector(selector):
     }})()
     """)
     if not result:
-        return f"error | selector '{selector}' not found. use describe_page() to see available elements"
+        return f"error | selector '{selector}' not found — call describe_page() to see current elements"
     r = json.loads(result)
     if r.get("error"):
-        return f"error | selector '{selector}' not found. use describe_page() to see available elements"
+        return f"error | selector '{selector}' not found — call describe_page() to see current elements"
     return f"clicked '{r['label']}' ({r['selector']})"
 
 
@@ -311,10 +311,10 @@ def click_text(text):
     }})()
     """)
     if not result:
-        return f"error | no clickable element with text '{text}' found. use describe_page() to see available elements"
+        return f"error | no clickable element with text '{text}' — call describe_page() to see available elements"
     r = json.loads(result)
     if r.get("error"):
-        return f"error | no clickable element with text '{text}' found. use describe_page() to see available elements"
+        return f"error | no clickable element with text '{text}' — call describe_page() to see available elements"
     return f"clicked '{r['label']}' ({r['tag']})"
 
 
@@ -325,9 +325,9 @@ def click_item(index):
         describe_page()
         cache = _read_cache()
     if cache is None:
-        return "error | could not build element cache. use describe_page() first"
+        return "error | could not build element cache — call describe_page() first, then retry"
     if index < 0 or index >= len(cache):
-        return f"error | index {index} out of range (0-{len(cache)-1}). use describe_page() to see available elements"
+        return f"error | index {index} out of range (0-{len(cache)-1}) — call describe_page() to see current elements"
     item = cache[index]
     return click_selector(item["selector"])
 
@@ -394,9 +394,9 @@ def fill_item(index, text):
         describe_page()
         cache = _read_cache()
     if cache is None:
-        return "error | could not build element cache. use describe_page() first"
+        return "error | could not build element cache — call describe_page() first, then retry"
     if index < 0 or index >= len(cache):
-        return f"error | index {index} out of range (0-{len(cache)-1}). use describe_page() to see available elements"
+        return f"error | index {index} out of range (0-{len(cache)-1}) — call describe_page() to see current elements"
     item = cache[index]
     return fill(item["selector"], text)
 
