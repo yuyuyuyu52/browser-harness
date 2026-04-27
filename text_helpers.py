@@ -327,6 +327,22 @@ def click_item(index):
     return click_selector(item["selector"])
 
 
+def click(target):
+    _ensure_ready()
+    before = _page_snapshot()
+    if isinstance(target, int):
+        result = click_item(target)
+    elif _is_css_selector(str(target)):
+        result = click_selector(str(target))
+    else:
+        result = click_text(str(target))
+    if result.startswith("error"):
+        return result
+    time.sleep(0.5)
+    after = _page_snapshot()
+    return f"{result} → {_change_summary(before, after)}"
+
+
 def fill(selector, text):
     _ensure_ready()
     escaped_sel = json.dumps(selector)
