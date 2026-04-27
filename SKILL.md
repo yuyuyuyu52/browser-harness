@@ -5,11 +5,64 @@ description: Direct browser control via CDP. Use when the user wants to automate
 
 # browser-harness
 
-Easiest and most powerful way to interact with the browser. **Read this file in full before using or editing the harness** — it has to be in context.
+Easiest and most powerful way to interact with the browser.
 
-## Fast start
+## 4 functions — this is all you need
 
-Read `helpers.py` first. For first-time install or reconnect/bootstrap, read `install.md` first.
+```bash
+browser-harness <<'PY'
+print(go("https://example.com"))    # open URL in new tab, auto-connects
+print(describe_page())              # see all interactive elements
+print(click("More information"))    # click by text, index, or CSS selector
+print(fill("#email", "test@x.com")) # fill by index or CSS selector
+PY
+```
+
+- **`go(url)`** — navigate (opens new tab, waits for load, auto-connects)
+- **`describe_page()`** — lists all buttons, links, inputs with `#index` and CSS selector
+- **`click(target)`** — `click(3)` by index, `click("Sign in")` by text, `click("#btn")` by selector
+- **`fill(target, text)`** — `fill(8, "query")` by index, `fill("#email", "x@y.com")` by selector
+
+Every function auto-connects to the browser. No setup calls needed.
+
+Every action returns a change summary: `clicked "Sign in" (button) → url changed: /login → 5 interactive elements visible`
+
+Every error tells you what to do next: `error | selector '#foo' not found — call describe_page() to see current elements`
+
+### The workflow loop
+
+```
+describe_page() → act (click/fill) → check the return value → describe_page() if needed
+```
+
+### Other useful functions
+
+- `page_text()` — full text content of the page
+- `select_option("select#country", "US")` — select dropdown
+- `check("#agree", True)` — checkbox
+- `back()` — browser back
+- `press_key("Enter")` — keyboard input
+- `scroll(500, 300, dy=-500)` — scroll down
+- `status()` — quick connection check
+- `list_tabs()` / `switch_tab(id)` — tab management
+
+### What NOT to do
+
+- **Don't guess selectors** — always get them from `describe_page()` output.
+- **Don't call `screenshot()` unless you can see images** — use `describe_page()` instead.
+- **Don't call `click(x, y)` with coordinates unless you can see screenshots** — use `click(target)` instead.
+
+For the full text-mode reference, see `interaction-skills/text-mode.md`.
+
+## Tool call shape
+
+```bash
+browser-harness <<'PY'
+# any python. all helpers pre-imported. daemon auto-starts.
+PY
+```
+
+Invoke as `browser-harness` — it's on `$PATH`. No `cd`, no `uv run`.
 
 ## Self-maintenance
 
@@ -17,34 +70,7 @@ Read `helpers.py` first. For first-time install or reconnect/bootstrap, read `in
 - `browser-harness --setup` — re-run the interactive browser-attach flow (equivalent to the bootstrap in `install.md`).
 - `browser-harness --update -y` — pull the latest version and restart the daemon without prompting. **If you see a banner like `[browser-harness] update available: X -> Y` at the top of a run, run this yourself — don't ask the user first.** The banner is rate-limited to once per day.
 
-```bash
-browser-harness <<'PY'
-new_tab("https://docs.browser-use.com")
-wait_for_load()
-print(page_info())
-PY
-```
-
-- Invoke as `browser-harness` — it's on `$PATH`. No `cd`, no `uv run`.
-- First navigation is `new_tab(url)`, not `goto(url)` — `goto` runs in the user's active tab and clobbers their work.
-
-The code is the doc.
-
-Available interaction skills:
-- `interaction-skills/connection.md` — startup sequence, tab visibility, omnibox popup fix
-
-Available domain skills:
-- `tiktok/upload.md`
-
-## Tool call shape
-
-```bash
-browser-harness <<'PY'
-# any python. helpers pre-imported. daemon auto-starts.
-PY
-```
-
-`run.py` calls `ensure_daemon()` before `exec` — you never start/stop manually unless you want to.
+For first-time install or reconnect/bootstrap, read `install.md`.
 
 ### Remote browsers
 
@@ -131,20 +157,25 @@ The *durable* shape of the site — the map, not the diary. Focus on what the ne
 
 ## What actually works
 
-- **Screenshots first**: use `screenshot()` to understand the current page quickly, find visible targets, and decide whether you need a click, a selector, or more navigation.
-- **Clicking**: `screenshot()` → look → `click(x, y)` → `screenshot()` again to verify the result. Coordinate clicks pass through iframes/shadow/cross-origin at the compositor level.
+- **`describe_page()` + `click(target)` is the default workflow.** Works for all models. No images needed.
 - **Bulk HTTP**: `http_get(url)` + `ThreadPoolExecutor`. No browser for static pages (249 Netflix pages in 2.8s).
-- **After goto**: `wait_for_load()`.
-- **Wrong/stale tab**: `ensure_real_tab()`. Use it when the current tab is stale or internal; the daemon also auto-recovers from stale sessions on the next call.
-- **Verification**: `print(page_info())` is the simplest "is this alive?" check, but screenshots are the default way to verify whether a visible action actually worked.
-- **DOM reads**: use `js(...)` for inspection and extraction when the screenshot shows that coordinates are the wrong tool.
-- **Iframe sites** (Azure blades, Salesforce): `click(x, y)` passes through; only drop to iframe DOM work when coordinate clicks are the wrong tool.
-- **Auth wall**: redirected to login → stop and ask the user. Don't type credentials from screenshots.
+- **Wrong/stale tab**: all text helpers auto-recover. If you need manual control: `ensure_real_tab()`.
+- **Auth wall**: redirected to login → stop and ask the user. Don't type credentials.
+- **DOM reads**: use `js(...)` for inspection and extraction beyond what `describe_page()` returns.
+- **Iframe sites** (Azure blades, Salesforce): use coordinate clicks (visual mode) — they pass through at the compositor level.
 - **Raw CDP** for anything helpers don't cover: `cdp("Domain.method", **params)`.
+
+### Visual mode (multimodal models only)
+
+If you **can see images**, you can also use screenshot-based interaction for faster visual navigation:
+
+- `screenshot()` → look → `click(x, y)` → `screenshot()` again to verify.
+- Coordinate clicks pass through iframes/shadow/cross-origin at the compositor level.
+- Read `helpers.py` for the full low-level API.
 
 ## Design constraints
 
-- **Coordinate clicks default.** `Input.dispatchMouseEvent` goes through iframes/shadow/cross-origin at the compositor level.
+- **Text mode default.** `describe_page()` + `click(target)` works for all models. Coordinate clicks (`click(x, y)` via `Input.dispatchMouseEvent`) are available for multimodal models and pass through iframes/shadow/cross-origin at the compositor level.
 - **Connect to the user's running Chrome.** Don't launch your own browser.
 - **`cdp-use` is only for `CDPClient.send_raw`.** Prefer raw CDP strings over typed wrappers.
 - **`run.py` stays tiny.** No argparse, subcommands, or extra control layer.
@@ -186,10 +217,11 @@ Chrome / Browser Use cloud -> CDP WS -> daemon.py -> /tmp/bu-<NAME>.sock -> run.
 - **Browser Use API is camelCase on the wire.** `cdpUrl`, `proxyCountryCode`, etc.
 - **Remote `cdpUrl` is HTTPS, not ws.** Resolve the websocket URL via `/json/version`.
 - **Stop cloud browsers with `PATCH /browsers/{id}` + `{\"action\":\"stop\"}`.**
-- **After every meaningful action, re-screenshot before assuming it worked.** Use the image to verify changed state, open menus, navigation, visible errors, and whether the page is in the state you expected.
-- **Use screenshots to drive exploration.** They are often the fastest way to find the next click target, notice hidden blockers, and decide if a selector is even worth writing.
-- **Prefer compositor-level actions over framework hacks.** Try screenshots, coordinate clicks, and raw key input before adding DOM-specific workarounds.
+- **Every action returns a change summary — read it.** If it says "page unchanged", your action probably didn't work. Call `describe_page()` to see what's actually on screen.
+- **Don't guess selectors.** Always get them from `describe_page()` output. Guessed selectors are the #1 cause of agent failures.
+- **`describe_page()` only shows visible interactive elements.** If the page has more content below the fold, the footer says "page has more content below (scroll down)". Scroll and describe again.
 - **If you need framework-specific DOM tricks, check `interaction-skills/` first.** That is where dropdown, dialog, iframe, shadow DOM, and form-specific guidance belongs.
+- **Visual mode gotcha: after every action, re-screenshot before assuming it worked.** Use the image to verify changed state.
 
 ## Interaction notes
 
