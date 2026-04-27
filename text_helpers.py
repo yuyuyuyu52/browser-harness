@@ -198,6 +198,7 @@ def _read_cache():
 
 
 def describe_page(max_items=50):
+    _ensure_ready()
     info = page_info()
     if "dialog" in info:
         d = info["dialog"]
@@ -247,6 +248,7 @@ def describe_page(max_items=50):
 
 
 def page_text(max_length=3000):
+    _ensure_ready()
     raw = js("document.body.innerText") or ""
     if len(raw) > max_length:
         return raw[:max_length] + f"\n\n...truncated ({len(raw) - max_length} chars remaining, use page_text(max_length={len(raw)}) to see all)"
@@ -254,6 +256,7 @@ def page_text(max_length=3000):
 
 
 def click_selector(selector):
+    _ensure_ready()
     result = js(f"""
     (function() {{
         const el = document.querySelector({json.dumps(selector)});
@@ -273,6 +276,7 @@ def click_selector(selector):
 
 
 def click_text(text):
+    _ensure_ready()
     escaped = json.dumps(text)
     result = js(f"""
     (function() {{
@@ -310,6 +314,7 @@ def click_text(text):
 
 
 def click_item(index):
+    _ensure_ready()
     cache = _read_cache()
     if cache is None:
         describe_page()
@@ -323,6 +328,7 @@ def click_item(index):
 
 
 def fill(selector, text):
+    _ensure_ready()
     escaped_sel = json.dumps(selector)
     escaped_val = json.dumps(text)
     result = js(f"""
@@ -348,6 +354,7 @@ def fill(selector, text):
 
 
 def fill_item(index, text):
+    _ensure_ready()
     cache = _read_cache()
     if cache is None:
         describe_page()
@@ -361,6 +368,7 @@ def fill_item(index, text):
 
 
 def select_option(selector, value):
+    _ensure_ready()
     escaped_sel = json.dumps(selector)
     escaped_val = json.dumps(value)
     result = js(f"""
@@ -390,6 +398,7 @@ def select_option(selector, value):
 
 
 def check(selector, checked=True):
+    _ensure_ready()
     escaped_sel = json.dumps(selector)
     result = js(f"""
     (function() {{
@@ -411,12 +420,14 @@ def check(selector, checked=True):
 
 
 def go(url):
+    _ensure_ready()
     new_tab(url)
     wait_for_load()
     return status()
 
 
 def back():
+    _ensure_ready()
     js("history.back()")
     wait_for_load()
     return status()
