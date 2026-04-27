@@ -64,6 +64,13 @@ PY
 
 Invoke as `browser-harness` — it's on `$PATH`. No `cd`, no `uv run`.
 
+If auto-detection fails, set `BU_CDP_WS` to connect directly:
+```bash
+BU_CDP_WS=ws://127.0.0.1:9222/devtools/browser/... browser-harness <<'PY'
+print(describe_page())
+PY
+```
+
 ## Self-maintenance
 
 - `browser-harness --doctor` — diagnose install, daemon, browser, and whether an update is available.

@@ -58,9 +58,35 @@ def log(msg):
     open(LOG, "a").write(f"{msg}\n")
 
 
+def _probe_port(port, timeout=2):
+    """Check if a port is listening. Returns True/False."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    try:
+        s.connect(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def _ws_from_http(port):
+    """GET /json/version on a CDP HTTP port → webSocketDebuggerUrl."""
+    try:
+        raw = urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=3).read()
+        return json.loads(raw).get("webSocketDebuggerUrl")
+    except Exception:
+        return None
+
+
+COMMON_CDP_PORTS = [9222, 9229, 9333]
+
+
 def get_ws_url():
     if url := os.environ.get("BU_CDP_WS"):
         return url
+    # 1. Try DevToolsActivePort files (Chrome launched via chrome://inspect checkbox)
     for base in PROFILES:
         try:
             port, path = (base / "DevToolsActivePort").read_text().strip().split("\n", 1)
@@ -82,7 +108,19 @@ def get_ws_url():
             finally:
                 probe.close()
         return f"ws://127.0.0.1:{port.strip()}{path.strip()}"
-    raise RuntimeError(f"DevToolsActivePort not found in {[str(p) for p in PROFILES]} — enable chrome://inspect/#remote-debugging, or set BU_CDP_WS for a remote browser")
+    # 2. Try common --remote-debugging-port ports (Chrome launched with flag)
+    for port in COMMON_CDP_PORTS:
+        if _probe_port(port):
+            ws = _ws_from_http(port)
+            if ws:
+                log(f"found Chrome on port {port} via /json/version")
+                return ws
+    raise RuntimeError(
+        "Chrome not found — tried DevToolsActivePort and ports 9222/9229/9333. "
+        "Either: (1) enable chrome://inspect/#remote-debugging, "
+        "(2) start Chrome with --remote-debugging-port=9222, "
+        "or (3) set BU_CDP_WS=ws://host:port/devtools/browser/..."
+    )
 
 
 def stop_remote():
