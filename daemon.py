@@ -139,6 +139,8 @@ class Daemon:
         self.stop = asyncio.Event()
         url = get_ws_url()
         log(f"connecting to {url}")
+        for k in ("ALL_PROXY", "all_proxy", "HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+            os.environ.pop(k, None)
         self.cdp = CDPClient(url)
         try:
             await self.cdp.start()
